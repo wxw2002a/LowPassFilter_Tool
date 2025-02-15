@@ -8,6 +8,7 @@ This repository contains a demonstration of a custom Lp-norm-based filter in Pyt
 - **LP Filter**: Implements an iterative Lp-based filter.
 - **Signal Generation**: Generates step, ramp, and sine wave signals for testing.
 - **CSV Reading**: Reads custom data from CSV files (e.g., if `number=3, 4, 5` is selected in `lp_filter`).
+- user can change their own data in number =3,4,5 to have their own lowpassfilter response.
 - **Plotting**: Visualizes the filtered output alongside the original signal.
 
 ---
