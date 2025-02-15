@@ -162,10 +162,13 @@ def lp_filter(
         x_in = generate_signal('ramp')
     elif number == 3:
         x_in = read_csv_signal(r"C:\Users\wangx\Desktop\importeddocument\Surge_x2x.csv", column=0, max_samples=10000)
+         #user can use their own data
     elif number == 4:
         x_in = read_csv_signal(r"C:\Users\wangx\Desktop\importeddocument\scope_62_10k.csv", column=1)
+         #user can use their own data
     elif number == 5:
         x_in = read_csv_signal(r"C:\Users\wangx\Desktop\importeddocument\Motor wires.csv", column=1, max_samples=5000)
+         #user can use their own data
     else:
         # Default case, generate a sine signal if 'number' doesn't match 1-5
         x_in = generate_signal('sin')
