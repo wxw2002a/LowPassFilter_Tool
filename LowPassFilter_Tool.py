@@ -1,238 +1,163 @@
-import numpy as np  # NumPy is used for numerical computations, such as handling arrays, mathematical operations, and polynomial fitting.
-import pandas as pd  # Pandas is used for data analysis and manipulation, including reading CSV files into DataFrame objects.
-import matplotlib.pyplot as plt  # Matplotlib is a plotting library for creating static, animated, and interactive visualizations in Python.
+# -*- coding: utf-8 -*-
+import numpy as np
+import matplotlib.pyplot as plt
 
-# A very small constant used to avoid division-by-zero errors or extremely small denominators in certain calculations.
+# A small constant to avoid division by zero in calculations.
 EPSILON = 1e-18
 
 def interpolate_quadratic_vertex(x_vals, y_vals):
     """
-    Fits a second-degree polynomial (quadratic) to the provided data points (x_vals, y_vals),
-    then computes and returns the x-coordinate of the vertex of that quadratic.
-
-    :param x_vals: A list or array of x-coordinates.
-    :param y_vals: A list or array of y-coordinates corresponding to x_vals.
-    :return: The x-coordinate of the vertex of the fitted quadratic.
-    :raises ValueError: If the leading (quadratic) coefficient is effectively zero,
-        meaning a parabola cannot be formed uniquely.
+    Fit a quadratic polynomial (degree 2) to the provided data points (x_vals, y_vals)
+    and return the x-coordinate of its vertex.
+    
+    This function uses numpy.polyfit to get the coefficients [a, b, c] of the quadratic:
+        a*x^2 + b*x + c
+    
+    The vertex is computed as -b/(2*a). If the quadratic coefficient 'a' is too small,
+    a ValueError is raised to indicate that a unique vertex cannot be determined.
+    
+    Parameters:
+        x_vals : array-like
+            The x-values for the data points.
+        y_vals : array-like
+            The y-values corresponding to x_vals.
+    
+    Returns:
+        float: The x-coordinate of the vertex of the fitted quadratic polynomial.
     """
-    # np.polyfit fits a polynomial of degree 2 to the given x_vals and y_vals,
-    # returning the coefficients [a, b, c] for a*x^2 + b*x + c.
-    p = np.polyfit(x_vals, y_vals, 2)
-    
-    # p[0] is the coefficient a. If |a| < EPSILON, we can't compute a meaningful vertex.
-    if abs(p[0]) < EPSILON:
-        raise ValueError("Quadratic coefficient is near zero; cannot find a unique vertex.")
-    
-    # The x-coordinate of the vertex of a quadratic a*x^2 + b*x + c is -b / (2a).
-    return -p[1] / (2 * p[0])
-
-def generate_signal(signal_type, n=100, t1=3, t2=0.005):
-    """
-    Generates different types of signals based on 'signal_type': 'step', 'ramp', or 'sin'.
-    The function can be extended to support more signal types.
-
-    :param signal_type: A string indicating which type of signal to generate ('step', 'ramp', 'sin').
-    :param n: The sampling rate or number of samples per 1 unit of time (used in time discretization).
-    :param t1: The end time for 'step' and 'ramp' signals (in seconds or arbitrary units).
-    :param t2: A parameter used as threshold time for the step or ramp signals, 
-               or as a small offset for demonstration (depends on signal type).
-    :return: A NumPy array representing the generated signal.
-    :raises ValueError: If 'signal_type' is not recognized or supported.
-    """
-    # Create a time array from 0 to t1 (inclusive), stepping by 1/n.
-    t = np.arange(0, t1 + 1/n, 1/n)
-    
-    if signal_type == 'step':
-        # Step signal: 0 before t2, 1 after t2 (including t2).
-        # (t >= t2) returns a boolean array; astype(float) converts True -> 1.0, False -> 0.0
-        return (t >= t2).astype(float)
-    
-    elif signal_type == 'ramp':
-        # Ramp signal:
-        #   from time 0 to t2, output increases linearly (like a ramp).
-        #   after t2, it stays at a constant level.
-        nx = round(t2 * n)    # The index at which to switch to a constant
-        x_in = np.zeros_like(t)
-        
-        # For indices less than nx, we let x_in = t (a linear increase).
-        x_in[:nx] = t[:nx]
-        
-        # For indices >= nx, the value remains the last ramp value (t[nx-1]).
-        x_in[nx:] = t[nx - 1]
-        return x_in
-    
-    elif signal_type == 'sin':
-        # A simple sine wave signal:
-        freq = 1
-        # We create a time array at a 0.01 step from 0 to 100.01, then compute sine.
-        t_sin = np.arange(0, 100.01, 0.01)
-        return np.sin(2 * np.pi * freq * t_sin)
-    
-    else:
-        raise ValueError(f"Unsupported signal_type: {signal_type}")
-
-def read_csv_signal(filepath, column=1, max_samples=None):
-    """
-    Reads a CSV file from a given filepath and extracts a specific column of data.
-    Optionally restricts the maximum number of samples returned.
-
-    :param filepath: The path to the CSV file.
-    :param column: The zero-based index of the column to extract.
-    :param max_samples: If provided, restricts the returned data to this many samples.
-    :return: A NumPy array of the extracted data values.
-    """
-    # Read the CSV file as a DataFrame. 'header=None' means the CSV has no header row.
-    df = pd.read_csv(filepath, header=None)
-    
-    # Extract the specified column as a NumPy array.
-    data = df.iloc[:, column].to_numpy()
-    
-    # If a maximum number of samples is given, slice the array.
-    if max_samples is not None:
-        data = data[:max_samples]
-    
-    return data
+    p = np.polyfit(x_vals, y_vals, 2)  # Fit a quadratic polynomial.
+    if abs(p[0]) < EPSILON:  # Check if the quadratic coefficient is near zero.
+        raise ValueError("Quadratic coefficient is too small to determine a unique vertex.")
+    return -p[1] / (2 * p[0])  # Compute the vertex x-coordinate.
 
 def R_calculation(x, y, p, T, h):
     """
-    Calculates a quantity 'R' used in the iterative update in the lp_filter function.
-    It applies an exponential weighting and an lp-norm-like transformation.
-
-    :param x: The array (window) of input signal samples.
-    :param y: The candidate filter output value for which we compute R.
-    :param p: The norm-like parameter (Lp_norm_number).
-    :param T: A constant used in the exponential.
-    :param h: A step size for the exponent, used in np.exp(...) inside the function.
-    :return: The computed R value, which is 0 if it is smaller than EPSILON.
-    """
-    # n is the length of the window x.
-    n = len(x)
+    Compute the R value used for updating the LP filter output.
     
-    # We construct an array of exponent factors: exp( (1 through n)*h / T ).
+    The algorithm applies an exponential weighting to a window of input samples (x).
+    It computes two components:
+      - s1: The contribution of the last sample, scaled by the step size and time constant.
+      - s2: The sum of contributions of the remaining samples.
+    The two are added to yield s21, which is then transformed using an Lp-like norm.
+    
+    Parameters:
+        x : array-like
+            A window (subset) of input samples.
+        y : float
+            A candidate output value for which R is calculated.
+        p : float
+            The Lp norm parameter.
+        T : float
+            The time constant used in the exponential weighting.
+        h : float
+            The step size used in computing the exponential factors.
+    
+    Returns:
+        float: The computed R value. If the combined value s21 is very small,
+               returns 0.0 to avoid numerical issues.
+    """
+    n = len(x)
+    # Compute exponential weights: exp((i * h) / T) for each sample in the window.
     exp_vals = np.exp(np.arange(1, n + 1) * h / T)
     
-    # s1: The contribution of the last sample in x (x[-1]) compared to y, scaled by an exponential.
-    s1 = (h * T / 2.0) * (abs(x[-1] - y)**(p - 1)) * np.sign(x[-1] - y) * exp_vals[-1]
+    # s1 is the contribution from the last sample in the window.
+    s1 = (h * T / 2.0) * (abs(x[-1] - y) ** (p - 1)) * np.sign(x[-1] - y) * exp_vals[-1]
     
-    # s2: Sum of contributions of the rest of the samples in x, using exponential weights.
+    # s2 sums the contributions of the remaining samples.
     diff = x[:-1] - y
-    s2 = np.sum((np.abs(diff)**(p - 1)) * np.sign(diff) * exp_vals[:-1]) * (h / T)
+    s2 = np.sum((np.abs(diff) ** (p - 1)) * np.sign(diff) * exp_vals[:-1]) * (h / T)
     
-    # Sum the two parts.
-    s21 = s1 + s2
+    s21 = s1 + s2  # Combine both contributions.
     
-    # If s21 is very close to zero, return 0 to avoid numerical issues.
-    return 0.0 if abs(s21) < EPSILON else (abs(s21)**(1 / (p - 1))) * np.sign(s21)
-
-def lp_filter(
-    Lp_norm_number,
-    number=1,
-    N=300,
-    n=500,
-    y_init=0,
-    y_delta=0.01,
-    y_beta=0.001,
-    h=0.01,
-    T=1
-):
-    """
-    A custom filter that uses an Lp-norm-like iterative approach to track and filter an input signal.
-    It attempts to adaptively find output y that minimizes (y - R_calculation(...))^2.
-
-    :param Lp_norm_number: The p in the Lp norm. Typical values could be >= 1.
-    :param number: An integer to select which input signal to use:
-                   1 -> step, 2 -> ramp, 3/4/5 -> read from CSV, else -> sin.
-    :param N: Number of samples of the output to produce (and to read from the input).
-    :param n: The window size for the R_calculation function.
-    :param y_init: The initial output value.
-    :param y_delta: A small increment used to generate y_candidates around the current y.
-    :param y_beta: A step used in the 'greedy' search to adjust y_out further.
-    :param h: Step size used in exponent calculations for R.
-    :param T: A time constant used in exponent calculations for R.
-    :return: (y, x_in[:N])
-        y     -> The filtered output array of length N.
-        x_in  -> The input signal array (truncated to length N if necessary).
-    """
-
-    # Select the input signal based on 'number'.
-    if number == 1:
-        x_in = generate_signal('step')
-    elif number == 2:
-        x_in = generate_signal('ramp')
-    elif number == 3:
-        x_in = read_csv_signal(r"C:\Users\wangx\Desktop\importeddocument\Surge_x2x.csv", column=0, max_samples=10000)
-         #user can use their own data
-    elif number == 4:
-        x_in = read_csv_signal(r"C:\Users\wangx\Desktop\importeddocument\scope_62_10k.csv", column=1)
-         #user can use their own data
-    elif number == 5:
-        x_in = read_csv_signal(r"C:\Users\wangx\Desktop\importeddocument\Motor wires.csv", column=1, max_samples=5000)
-         #user can use their own data
+    if abs(s21) < EPSILON:
+        return 0.0  # Return 0 to avoid numerical instability.
     else:
-        # Default case, generate a sine signal if 'number' doesn't match 1-5
-        x_in = generate_signal('sin')
+        # Return the Lp-based transformation of s21.
+        return (abs(s21) ** (1 / (p - 1))) * np.sign(s21)
+
+def custom_step_response(xin, T, p, n=None, y_init=0, y_delta=0.01, y_beta=0.001, h=0.01):
+    """
+    Process the input step signal 'xin' using the LP filter algorithm and return the filtered output.
     
-    # If the generated (or read) signal is shorter than N, limit N.
-    if len(x_in) < N:
-        N = len(x_in)
+    The algorithm iterates over each sample in the input signal, using a sliding window of 
+    size 'n' to compute a candidate output update based on the R_calculation. It then uses a
+    local search strategy (adjusting upward and downward by y_beta) to refine the output.
     
-    # Initialize the output array of length N, setting the first output to y_init.
-    y = np.zeros(N, dtype=float)
-    y[0] = y_init
+    Parameters:
+        xin : list or array-like
+            The input signal (e.g., a step signal).
+        T : float
+            The time constant for exponential weight calculation.
+        p : float
+            The Lp norm parameter (e.g., 1.1, 1.02, 1.3, etc.).
+        n : int, optional
+            The window size for processing. Defaults to 500 if not provided.
+        y_init : float, optional
+            The initial output value (default is 0).
+        y_delta : float, optional
+            The increment used to generate candidate outputs (default is 0.01).
+        y_beta : float, optional
+            The step size for local adjustment of the output (default is 0.001).
+        h : float, optional
+            The step size used in the exponential calculation (default is 0.01).
     
-    # Store the Lp norm parameter in a local variable for convenience.
-    p = Lp_norm_number
-    
-    # We iterate over each sample from 1 to N-1 (since y[0] is already set).
+    Returns:
+        tuple:
+            y : numpy array
+                The filtered output signal.
+            xin : numpy array
+                The input signal (converted to an array, may be truncated to match y's length).
+    """
+    xin = np.array(xin, dtype=float)  # Convert input list to a numpy array.
+    N = len(xin)  # Total number of samples in the input.
+    if n is None:
+        n = 500  # Default window size.
+    y = np.zeros(N, dtype=float)  # Initialize output array.
+    y[0] = y_init  # Set the initial output value.
+
+    # Process each sample starting from the second one.
     for step in range(1, N):
-        
-        # Create a window of size n from the input x_in.
-        # If 'step' is less than n, we fill the window such that the beginning is zeros 
-        # and the end includes x_in up to the current step.
-        x_window = np.zeros(n)
+        # Create a window of 'n' samples ending at the current step.
         if step < n:
-            x_window[n - step - 1:] = x_in[:step + 1]
+            # If there are not enough samples, pad the beginning with zeros.
+            x_window = np.zeros(n)
+            x_window[n - step - 1:] = xin[:step + 1]
         else:
-            x_window = x_in[step - n + 1 : step + 1]
+            # Otherwise, use the last 'n' samples.
+            x_window = xin[step - n + 1: step + 1]
         
-        # Get the previous output y. This is our 'center' point for exploration (y_delta steps).
-        y2 = y[step - 1]
+        y_prev = y[step - 1]  # The previous output value.
+        # Generate three candidate outputs: one lower, one equal, and one higher than the previous value.
+        y_candidates = np.array([y_prev - y_delta, y_prev, y_prev + y_delta])
         
-        # Define three candidate outputs around the current y2: (y2 - y_delta, y2, y2 + y_delta).
-        y_candidates = np.array([y2 - y_delta, y2, y2 + y_delta])
-        
-        # For each candidate, compute R_calculation(...).
+        # Compute the R value for each candidate.
         R_vals = np.array([R_calculation(x_window, cand, p, T, h) for cand in y_candidates])
+        # Calculate the squared error between each candidate and its corresponding R value.
+        j = (y_candidates - R_vals) ** 2
         
-        # The cost function j is defined as (y_candidate - R_val)^2.
-        j = (y_candidates - R_vals)**2
+        try:
+            # Use quadratic interpolation to estimate the optimal candidate.
+            y_out = interpolate_quadratic_vertex(y_candidates, j)
+        except ValueError:
+            # If interpolation fails, choose the middle candidate.
+            y_out = y_candidates[1]
         
-        # Use our quadratic interpolation to guess the 'best' y_out by fitting a parabola
-        # to the (y_candidates, j) points, and then finding the vertex.
-        y_out = interpolate_quadratic_vertex(y_candidates, j)
-        
-        # Define a helper function that computes |val - R_calculation(...)|.
-        # We want to minimize this difference.
+        # Define a helper function that computes the absolute difference for a candidate.
         def diff_fn(val):
             return abs(val - R_calculation(x_window, val, p, T, h))
         
-        # Check the difference at the interpolated y_out.
         diff_old = diff_fn(y_out)
-        
-        # We'll try nudging y_out upwards (by y_beta), see if that reduces the difference.
+        # Try adjusting upward: increment candidate by y_beta and check if improvement occurs.
         y_out_pos = y_out + y_beta
         diff_new = diff_fn(y_out_pos)
-        
         if diff_new < diff_old:
-            # If moving upwards in y decreases the difference, keep going in that direction
             while diff_new < diff_old:
                 y_out = y_out_pos
                 diff_old = diff_new
                 y_out_pos += y_beta
                 diff_new = diff_fn(y_out_pos)
         else:
-            # Otherwise, try nudging y_out downwards.
+            # Otherwise, try adjusting downward.
             y_out_neg = y_out - y_beta
             diff_new = diff_fn(y_out_neg)
             while diff_new < diff_old:
@@ -240,58 +165,135 @@ def lp_filter(
                 diff_old = diff_new
                 y_out_neg -= y_beta
                 diff_new = diff_fn(y_out_neg)
-        
-        # Store our updated y_out as the output for this step.
+        # Update the output for the current step.
         y[step] = y_out
+
+    return y, xin
+
+def generate_step_signal(n=100, t1=3, t2=0.005):
+    """
+    Generate a step signal using the original parameters.
     
-    # Return the filtered output y and the (truncated) input x_in.
-    return y, x_in[:N]
-
-def plot_lp_filter_by_number(num):
+    Parameters:
+        n : int, optional
+            The sampling rate (samples per unit time). Default is 100.
+        t1 : float, optional
+            The end time of the signal. Default is 3.
+        t2 : float, optional
+            The threshold time at which the step occurs. Default is 0.005.
+    
+    Returns:
+        numpy array: The generated step signal.
+        
+    The function creates a time vector from 0 to t1 with steps of 1/n, then returns a
+    binary signal that is 0 before time t2 and 1 from time t2 onward.
     """
-    Plots different Lp filter outputs for a given 'num' (which selects the input signal).
-    It compares the input signal (shown in gray) to the outputs from various p-values in lp_values.
+    t = np.arange(0, t1 + 1/n, 1/n)
+    return (t >= t2).astype(float)
 
-    :param num: An integer specifying which input signal to plot (1, 2, 3, 4, 5, or other for 'sin').
+def test_number1():
     """
-    # List of different p-values we want to test.
+    Test function that exactly replicates the original "number1" case.
+    
+    This function uses the following fixed parameters:
+      - Step signal generated with n=100, t1=3, t2=0.005.
+      - T = 1.0.
+      - lp_values = [2, 1.8, 1.6, 1.4, 1.2, 1.1, 1.02].
+      - Filtering parameters: y_init=0, y_delta=0.01, y_beta=0.001, h=0.01.
+      
+    The input signal is plotted using the original color "#E0E0E0", and each filtered output
+    is plotted using subsequent colors.
+    """
+    # Generate the default step signal using original parameters.
+    xin = generate_step_signal()
+    T_val = 1.0
     lp_values = [2, 1.8, 1.6, 1.4, 1.2, 1.1, 1.02]
-    
-    # A set of distinct colors for plotting the input and each output.
     colors = ["#E0E0E0", "#CC0000", "#FF8000", "#FFFF00", "#00FF00", "#00FFFF", "#0080FF", "#FF00FF"]
     
-    # Create a new figure for plotting.
-    plt.figure()
-    
-    # Get one reference output from the filter with p=2, also retrieving the input signal.
-    # '_' is used to capture the unused output from lp_filter (since we only need x_in).
-    _, x_in = lp_filter(2, number=num)
-    
-    # Plot the input signal in gray (colors[0]).
-    plt.plot(x_in, color=colors[0], label="Input")
-    
-    # For each p-value in lp_values, compute the filter output and plot.
+    plt.figure(figsize=(8, 4))
+    # Plot the input signal with the specified original input color.
+    plt.plot(xin, color=colors[0], label="Input")
+    # For each lp value, compute the filtered output and plot it.
     for i, lp_val in enumerate(lp_values):
-        y_out, _ = lp_filter(lp_val, number=num)
+        # Note: In test mode, filtering parameters remain unchanged.
+        y_out, _ = custom_step_response(xin, T_val, p=lp_val)
         plt.plot(y_out, color=colors[i+1], label=f"lp={lp_val}")
     
-    # Add plot title and labels.
-    plt.title(f"Lp Filter Responses (number={num})")
     plt.xlabel("Sample Index")
     plt.ylabel("Amplitude")
-    
-    # Show legend.
+    plt.title("LP Filter Responses (number1 - Step Signal)")
     plt.legend(loc="best")
+    plt.grid(True)
     plt.show()
 
-def plot_all_separately():
-    """
-    Calls plot_lp_filter_by_number for a series of numbers (1 through 6),
-    generating a separate plot for each input signal configuration.
-    """
-    for num in [1, 2, 3, 4, 5, 6]:
-        plot_lp_filter_by_number(num)
-
-# If this script is run as the main program, generate the plots for all signals.
 if __name__ == "__main__":
-    plot_all_separately()
+    print("Choose mode:")
+    print("1: Interactive mode (enter your own xin, T, lp, y_init, y_delta, y_beta, and h values)")
+    print("2: Test mode (generate default step signal with original 'number1' parameters)")
+    mode = input("Enter mode (1 or 2): ").strip()
+    
+    if mode == "2":
+        test_number1()
+    else:
+        # Read input data. Supports comma-separated or whitespace-separated values.
+        xin_str = input("Please enter the xin array (values separated by commas or whitespace):\n")
+        if ',' in xin_str:
+            xin_list = [float(x.strip()) for x in xin_str.split(',') if x.strip()]
+        else:
+            xin_list = [float(x.strip()) for x in xin_str.split() if x.strip()]
+        if len(xin_list) == 0:
+            print("Error: No valid numbers provided.")
+            exit(1)
+    
+        try:
+            T_val = float(input("Please enter T (time constant): "))
+        except Exception:
+            print("Error: T must be a valid number.")
+            exit(1)
+    
+        try:
+            lp_val = float(input("Please enter the lp value: "))
+        except Exception:
+            print("Error: lp value must be a valid number.")
+            exit(1)
+        
+        # Prompt for additional custom parameters.
+        try:
+            y_init_str = input("Please enter y_init (initial output) [default=0]: ").strip()
+            y_init = float(y_init_str) if y_init_str != "" else 0.0
+        except Exception:
+            print("Error: y_init must be a valid number.")
+            exit(1)
+        
+        try:
+            y_delta_str = input("Please enter y_delta (candidate step increment) [default=0.01]: ").strip()
+            y_delta = float(y_delta_str) if y_delta_str != "" else 0.01
+        except Exception:
+            print("Error: y_delta must be a valid number.")
+            exit(1)
+        
+        try:
+            y_beta_str = input("Please enter y_beta (local adjustment step) [default=0.001]: ").strip()
+            y_beta = float(y_beta_str) if y_beta_str != "" else 0.001
+        except Exception:
+            print("Error: y_beta must be a valid number.")
+            exit(1)
+        
+        try:
+            h_str = input("Please enter h (step size in exponential calculation) [default=0.01]: ").strip()
+            h = float(h_str) if h_str != "" else 0.01
+        except Exception:
+            print("Error: h must be a valid number.")
+            exit(1)
+    
+        # In interactive mode, generate a single filtered output using the custom parameters.
+        y_out, _ = custom_step_response(xin_list, T_val, p=lp_val, y_init=y_init, y_delta=y_delta, y_beta=y_beta, h=h)
+        plt.figure(figsize=(8, 4))
+        plt.plot(np.array(xin_list), color="gray", label="Input")
+        plt.plot(y_out, color='blue', label=f"Filtered Output (lp={lp_val})")
+        plt.xlabel("Sample Index")
+        plt.ylabel("Amplitude")
+        plt.title("Custom Step Response")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
