@@ -75,7 +75,7 @@ def R_calculation(x, y, p, T, h):
         # Return the Lp-based transformation of s21.
         return (abs(s21) ** (1 / (p - 1))) * np.sign(s21)
 
-def custom_step_response(xin, T, p, n=None, y_init=0, y_delta=0.01, y_beta=0.001, h=0.01):
+def Lp_filter(xin, T, p, h=0.01, n=None, y_init=0, y_delta=0.01, y_beta=0.001):
     """
     Process the input step signal 'xin' using the LP filter algorithm and return the filtered output.
     
@@ -90,6 +90,8 @@ def custom_step_response(xin, T, p, n=None, y_init=0, y_delta=0.01, y_beta=0.001
             The time constant for exponential weight calculation.
         p : float
             The Lp norm parameter (e.g., 1.1, 1.02, 1.3, etc.).
+        h : float, optional
+            The step size used in the exponential calculation (default is 0.01). This represents the sampling time.
         n : int, optional
             The window size for processing. Defaults to 500 if not provided.
         y_init : float, optional
@@ -98,8 +100,6 @@ def custom_step_response(xin, T, p, n=None, y_init=0, y_delta=0.01, y_beta=0.001
             The increment used to generate candidate outputs (default is 0.01).
         y_beta : float, optional
             The step size for local adjustment of the output (default is 0.001).
-        h : float, optional
-            The step size used in the exponential calculation (default is 0.01).
     
     Returns:
         tuple:
@@ -216,7 +216,7 @@ def test_number1():
     # For each lp value, compute the filtered output and plot it.
     for i, lp_val in enumerate(lp_values):
         # Note: In test mode, filtering parameters remain unchanged.
-        y_out, _ = custom_step_response(xin, T_val, p=lp_val)
+        y_out, _ = Lp_filter(xin, T_val, p=lp_val, h=0.01)
         plt.plot(y_out, color=colors[i+1], label=f"lp={lp_val}")
     
     plt.xlabel("Sample Index")
@@ -287,7 +287,7 @@ if __name__ == "__main__":
             exit(1)
     
         # In interactive mode, generate a single filtered output using the custom parameters.
-        y_out, _ = custom_step_response(xin_list, T_val, p=lp_val, y_init=y_init, y_delta=y_delta, y_beta=y_beta, h=h)
+        y_out, _ = Lp_filter(xin_list, T_val, p=lp_val, h=h, y_init=y_init, y_delta=y_delta, y_beta=y_beta)
         plt.figure(figsize=(8, 4))
         plt.plot(np.array(xin_list), color="gray", label="Input")
         plt.plot(y_out, color='blue', label=f"Filtered Output (lp={lp_val})")
