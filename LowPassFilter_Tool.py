@@ -61,7 +61,7 @@ def R_calculation(x, y, p, T, h):
     exp_vals = np.exp(np.arange(1, n + 1) * h / T)
     
     # s1 is the contribution from the last sample in the window.
-    s1 = (h * T / 2.0) * (abs(x[-1] - y) ** (p - 1)) * np.sign(x[-1] - y) * exp_vals[-1]
+    s1 = (h  / (2.0*T)) * (abs(x[-1] - y) ** (p - 1)) * np.sign(x[-1] - y) * exp_vals[-1]
     
     # s2 sums the contributions of the remaining samples.
     diff = x[:-1] - y
